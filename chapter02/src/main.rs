@@ -1,3 +1,5 @@
+use std::ops::Add;
+
 enum Gender {
     Male,
     Female,
@@ -204,9 +206,21 @@ fn my_func8() {
     }
 }
 
+#[derive(Clone, Copy)]
 struct Vec2 {
     x: f64,
     y: f64,
+}
+
+impl Add for Vec2 {
+    type Output = Vec2;
+
+    fn add(self, rhs: Vec2) -> Vec2 {
+        Vec2 {
+            x: self.x + rhs.x,
+            y: self.y + rhs.y,
+        }
+    }
 }
 
 impl Vec2 {
@@ -229,6 +243,13 @@ fn my_func9() {
     println!("v.norm = {}", v.norm());
     v.set(3.8, 9.1);
     println!("v.norm = {}", v.norm());
+}
+
+fn my_func10() {
+    let v1 = Vec2 { x: 10.0, y: 5.0 };
+    let v2 = Vec2 { x: 3.1, y: 8.7 };
+    let v = v1 + v2;
+    println!("v.x = {}, v.y = {}", v.x, v.y);
 }
 
 fn main() {
@@ -258,7 +279,5 @@ fn main() {
     my_func7();
     my_func8();
     my_func9();
+    my_func10();
 }
-
-println!("A");
-println!("B");
