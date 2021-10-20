@@ -259,3 +259,6 @@ fn main() {
     my_func8();
     my_func9();
 }
+
+println!("A");
+println!("B");
