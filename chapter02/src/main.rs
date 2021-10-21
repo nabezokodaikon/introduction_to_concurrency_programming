@@ -21,11 +21,6 @@ struct Pair<A> {
     second: A,
 }
 
-enum Result<T, E> {
-    Ok(T),
-    Err(E),
-}
-
 fn let_example() -> u32 {
     let x = 100;
     let mut y = 20;
@@ -252,6 +247,55 @@ fn my_func10() {
     println!("v.x = {}, v.y = {}", v.x, v.y);
 }
 
+fn get_option_1() -> Option<u32> {
+    Some(1)
+}
+
+fn get_option_2() -> Option<u32> {
+    None
+}
+
+fn use_option_1() -> Option<u32> {
+    let a = get_option_1()?;
+    Some(a)
+}
+
+fn use_option_2() -> Option<u32> {
+    let a = match get_option_1() {
+        Some(e) => e,
+        None => return None,
+    };
+    Some(a)
+}
+
+fn result_option_1() {
+    let a = use_option_1();
+    println!("{}", a.unwrap());
+}
+
+fn result_option_2() {
+    let a = use_option_2();
+    println!("{}", a.unwrap());
+}
+
+fn get_result_1() -> Result<u32, String> {
+    Ok(2)
+}
+
+fn get_result_2() -> Result<u32, String> {
+    Err("3".to_string())
+}
+
+fn use_result_1() {
+    let a = get_result_1();
+    println!("{}", a.unwrap());
+}
+
+fn use_result_2() {
+    let a = get_result_2();
+    println!("{}", a.unwrap());
+}
+
 fn main() {
     let _p = Person {
         age: 20,
@@ -280,4 +324,18 @@ fn main() {
     my_func8();
     my_func9();
     my_func10();
+
+    result_option_1();
+    result_option_2();
+    use_result_1();
+    // use_result_2();
+    let option_1 = get_option_1().unwrap();
+    println!("{}", option_1);
+    // let option_2 = get_option_2().unwrap();
+    // println!("{}", option_2);
+
+    let result_1 = get_result_1().unwrap();
+    println!("{}", result_1);
+    let result_2 = get_result_2().unwrap();
+    println!("{}", result_2);
 }
