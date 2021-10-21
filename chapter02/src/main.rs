@@ -1,4 +1,33 @@
 use std::ops::Add;
+use std::thread::spawn;
+
+fn hello2() {
+    println!("Hello World!");
+}
+
+fn my_func11() {
+    spawn(hello2).join();
+    let h = || println!("Hello World!");
+    spawn(hello2).join();
+}
+
+fn my_func12() {
+    let v = 10;
+    let f = move || v * 2;
+
+    let result = spawn(f).join();
+    println!("result = {:?}", result);
+
+    match spawn(|| panic!("I'm panicked")).join() {
+        Ok(_) => {
+            println!("successed");
+        }
+        Err(a) => {
+            let s = a.downcast_ref::<&str>();
+            println!("failed: {:?}", s);
+        }
+    }
+}
 
 enum Gender {
     Male,
@@ -336,6 +365,11 @@ fn main() {
 
     let result_1 = get_result_1().unwrap();
     println!("{}", result_1);
-    let result_2 = get_result_2().unwrap();
-    println!("{}", result_2);
+    // let result_2 = get_result_2().unwrap();
+    // println!("{}", result_2);
+
+    my_func11();
+    my_func12();
+
+    println!("End");
 }
