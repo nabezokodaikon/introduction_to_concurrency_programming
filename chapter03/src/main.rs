@@ -1,5 +1,8 @@
 use std::collections::LinkedList;
+use std::ptr::{read_volatile, write_volatile};
+use std::sync::atomic::{fence, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
+use std::thread;
 
 pub struct Semaphore {
     mutex: Mutex<isize>,
@@ -82,35 +85,109 @@ pub fn channel<T>(max: isize) -> (Sender<T>, Receiver<T>) {
     (tx, rx)
 }
 
+const NUM_THREADS: usize = 4;
 const NUM_LOOP: usize = 100;
-const NUM_THREADS: usize = 8;
+
+macro_rules! read_mem {
+    ($addr: expr) => {
+        unsafe { read_volatile($addr) }
+    };
+}
+
+macro_rules! write_mem {
+    ($addr: expr, $val: expr) => {
+        unsafe { write_volatile($addr, $val) }
+    };
+}
+
+struct BakeryLock {
+    entering: [bool; NUM_THREADS],
+    tickets: [Option<f64>; NUM_THREADS],
+}
+
+impl BakeryLock {
+    fn lock(&mut self, idx: usize) -> LockGuard {
+        fence(Ordering::SeqCst);
+        write_mem!(&mut self.entering[idx], true);
+        fence(Ordering::SeqCst);
+
+        let mut max = 0;
+        for i in 0..NUM_THREADS {
+            if let Some(t) = read_mem!(&self.tickets[i]) {
+                max = max.max(t as usize);
+            }
+        }
+
+        let ticket = max + 1;
+        write_mem!(&mut self.tickets[idx], Some(ticket as f64));
+
+        fence(Ordering::SeqCst);
+        write_mem!(&mut self.entering[idx], false);
+        fence(Ordering::SeqCst);
+
+        for i in 0..NUM_THREADS {
+            if i == idx {
+                continue;
+            }
+
+            while read_mem!(&self.entering[i]) {}
+
+            loop {
+                match read_mem!(&self.tickets[i]) {
+                    Some(t) => {
+                        if ticket < t as usize || (ticket == t as usize && idx < i) {
+                            break;
+                        }
+                    }
+                    None => {
+                        break;
+                    }
+                }
+            }
+        }
+
+        fence(Ordering::SeqCst);
+        LockGuard { idx }
+    }
+}
+
+struct LockGuard {
+    idx: usize,
+}
+
+impl Drop for LockGuard {
+    fn drop(&mut self) {
+        fence(Ordering::SeqCst);
+        write_mem!(&mut LOCK.tickets[self.idx], None);
+    }
+}
+
+static mut LOCK: BakeryLock = BakeryLock {
+    entering: [false; NUM_THREADS],
+    tickets: [None; NUM_THREADS],
+};
+
+static mut COUNT: u64 = 0;
 
 fn main() {
-    let (tx, rx) = channel(4);
     let mut v = Vec::new();
-
-    let t = std::thread::spawn(move || {
-        let mut cnt = 0;
-        while cnt < NUM_THREADS * NUM_LOOP {
-            let n = rx.recv();
-            println!("recv: n = {:?}", n);
-            cnt += 1;
-        }
-    });
-
-    v.push(t);
-
     for i in 0..NUM_THREADS {
-        let tx0 = tx.clone();
-        let t = std::thread::spawn(move || {
-            for j in 0..NUM_LOOP {
-                tx0.send((i, j));
+        let th = thread::spawn(move || {
+            for _ in 0..NUM_LOOP {
+                let _lock = unsafe { LOCK.lock(i) };
+                unsafe { COUNT += 1 };
             }
         });
-        v.push(t);
+        v.push(th);
     }
 
-    for t in v {
-        t.join().unwrap();
+    for th in v {
+        th.join().unwrap();
     }
+
+    println!(
+        "COUNT = {} (expected = {})",
+        unsafe { COUNT },
+        NUM_LOOP * NUM_THREADS
+    );
 }
